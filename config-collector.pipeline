@@ -1,0 +1,42 @@
+import jenkins.model.*
+import hudson.model.*
+import java.nio.file.Files
+import java.nio.file.Paths
+
+node('master') {
+    timestamps {
+        stage('Get Job configs') {
+            def jobConfigsDir = "${env.WORKSPACE}/job-configs"
+            sh "rm -rf '${jobConfigsDir}' && mkdir -p '${jobConfigsDir}'"
+
+            def exportJob
+            exportJob = { item, parentPath = "" ->
+                def path = parentPath ? "${parentPath}/${item.name}" : item.name
+
+                if (item instanceof com.cloudbees.hudson.plugins.folder.AbstractFolder) {
+                    item.getItems().each { child -> exportJob(child, path) }
+                } else if (item instanceof TopLevelItem) {
+                    if (item.metaClass.respondsTo(item, "isDisabled") && item.isDisabled()) {
+                        // Skip disabled jobs
+                        return
+                    }
+
+                    def configFile = item.getConfigFile()
+                    if (configFile?.exists()) {
+                        def filePath = "${jobConfigsDir}/${path}.xml"
+                        def fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+                        new File(fileDir).mkdirs()
+                        Files.write(Paths.get(filePath), configFile.asString().getBytes("UTF-8"))
+                        println "Saved config.xml for ${path}"
+                    }
+                }
+            }
+
+            Jenkins.instance.getItems().each { exportJob(it) }
+        }
+
+        stage('Archive Configs') {
+            archiveArtifacts artifacts: 'job-configs/**/*.xml', onlyIfSuccessful: true
+        }
+    }
+}
