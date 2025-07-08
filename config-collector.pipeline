@@ -3,7 +3,7 @@ import hudson.model.*
 import java.nio.file.Files
 import java.nio.file.Paths
 
-node('master') {
+node {
     timestamps {
         stage('Get Job configs') {
             def jobConfigsDir = "${env.WORKSPACE}/job-configs"
