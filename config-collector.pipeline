@@ -2,6 +2,9 @@ import jenkins.model.*
 import hudson.model.*
 import java.nio.file.Files
 import java.nio.file.Paths
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 node {
     timestamps {
@@ -17,8 +20,19 @@ node {
                     item.getItems().each { child -> exportJob(child, path) }
                 } else if (item instanceof TopLevelItem) {
                     if (item.metaClass.respondsTo(item, "isDisabled") && item.isDisabled()) {
-                        // Skip disabled jobs
-                        return
+                        return // Skip disabled jobs
+                    }
+
+                    def lastBuild = item.getLastBuild()
+                    if (lastBuild == null) {
+                        return // Skip jobs that have never run
+                    }
+
+                    // Get the last build date and check if it occurred in 2025
+                    def lastBuildTime = lastBuild.getTime().toInstant()
+                    def zdt = ZonedDateTime.ofInstant(lastBuildTime, ZoneId.systemDefault())
+                    if (zdt.getYear() != 2025) {
+                        return // Skip jobs not built in 2025
                     }
 
                     def configFile = item.getConfigFile()
